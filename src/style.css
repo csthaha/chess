@@ -1,0 +1,24 @@
+/* 移除所有按钮的 outline 样式 */
+button:focus,
+button:active {
+  outline: none !important;
+}
+
+/* 如果需要，可以扩展到其他可聚焦元素 */
+input:focus,
+input:active,
+textarea:focus,
+textarea:active,
+select:focus,
+select:active {
+  outline: none !important;
+}
+
+/* 可选：为可聚焦元素添加自定义样式 */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid #00b96b; /* 自定义聚焦边框颜色 */
+  outline-offset: 2px; /* 调整边框与元素的距离 */
+}
