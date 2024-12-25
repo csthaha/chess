@@ -4,6 +4,16 @@
     class="game-container"
     @contextmenu="handleContextMenu"
   >
+    <GameTips
+      ref="gameTips"
+      :currentPlayer="currentPlayer"
+      :moveCount="moveCount"
+      :lastMove="lastMove"
+      :isWinningPattern="isWinningPattern"
+      :patternName="patternName"
+      :board="board"
+      :moveHistory="moveHistory"
+    />
     <div class="game-content">
       <div class="game-left">
         <canvas
@@ -14,9 +24,14 @@
           @click="handleClick"
           @mouseout="handleMouseOut"
         ></canvas>
-        <GameTimer :currentPlayer="currentPlayer" />
+        <GameTimer :currentPlayer="currentPlayer" ref="gameTimer" />
       </div>
       <div class="game-right">
+        <GameStats ref="gameStats" />
+        <GameRecord 
+          :moveHistory="moveHistory"
+          :boardSize="boardSize"
+        />
         <GameControls
           :moveCount="moveCount"
           :canRedo="redoHistory.length > 0"
@@ -54,6 +69,9 @@ import { useGameOperations } from '../hooks/useGameOperations';
 import GameControls from './GameControls.vue';
 import ContextMenu from './ContextMenu.vue';
 import GameTimer from './GameTimer.vue';
+import GameStats from './GameStats.vue';
+import GameTips from './GameTips.vue';
+import GameRecord from './GameRecord.vue';
 
 const canvas = ref(null);
 const boardSize = 15;
@@ -98,6 +116,8 @@ const lastMove = ref({ row: -1, col: -1 });
 // 添加重做历史记录
 const redoHistory = ref([]);
 
+// 添加存储获胜棋子位置的数组
+const winningPieces = ref([]);
 
 // 添加重做函数
 const redoMove = () => {
@@ -302,12 +322,13 @@ const checkWin = (row, col) => {
     [1, 0],   // 水平
     [0, 1],   // 垂直
     [1, 1],   // 右下斜
-    [1, -1],  // 右上斜
+    [1, -1]   // 右上斜
   ];
 
   for (const [dx, dy] of directions) {
-    let count = 1;  // 当前位置算1个
-    
+    let count = 1;
+    const pieces = [[row, col]]; // 记录连珠的位置
+
     // 正向检查
     for (let i = 1; i < 5; i++) {
       const newRow = row + dy * i;
@@ -322,6 +343,7 @@ const checkWin = (row, col) => {
         break;
       }
       count++;
+      pieces.push([newRow, newCol]);
     }
 
     // 反向检查
@@ -338,18 +360,70 @@ const checkWin = (row, col) => {
         break;
       }
       count++;
+      pieces.unshift([newRow, newCol]);
     }
 
     // 判断是否胜利
     if (count >= 5) {
+      winningPieces.value = pieces;
+      animateWinningPieces();
       setTimeout(() => {
         message.success(`${currentPlayer.value === 1 ? '黑' : '白'}子胜！`);
         startWinAnimation(currentPlayer.value);
-      }, 100);
+      }, 1500); // 等动画播放一会后再显示胜利
       return true;
     }
   }
   return false;
+};
+
+// 添加获胜棋子的动画函数
+const animateWinningPieces = () => {
+  const ctx = canvas.value.getContext('2d');
+  const offset = cellSize.value;
+  let frame = 0;
+  
+  const animate = () => {
+    // 重绘棋盘
+    initBoard();
+    
+    // 给获胜的五子添加特效
+    winningPieces.value.forEach(([row, col], index) => {
+      const x = offset + col * cellSize.value;
+      const y = offset + row * cellSize.value;
+      const radius = cellSize.value * 0.45;
+      
+      // 绘制光环
+      const glowSize = Math.sin(frame * 0.1 + index) * 4 + 8; // 光环大小随时间变化
+      ctx.beginPath();
+      ctx.arc(x, y, radius + glowSize, 0, Math.PI * 2);
+      ctx.strokeStyle = currentPlayer.value === 1 ? 
+        'rgba(255, 215, 0, 0.6)' : 'rgba(255, 215, 0, 0.6)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      
+      // 绘制闪烁效果
+      ctx.beginPath();
+      ctx.arc(x, y, radius - 2, 0, Math.PI * 2);
+      ctx.fillStyle = currentPlayer.value === 1 ? 
+        `rgba(0, 0, 0, ${0.8 + Math.sin(frame * 0.2 + index) * 0.2})` : 
+        `rgba(255, 255, 255, ${0.8 + Math.sin(frame * 0.2 + index) * 0.2})`;
+      ctx.fill();
+      
+      if (currentPlayer.value === 2) {
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    });
+    
+    frame++;
+    if (frame < 60) { // 动画持续约1秒
+      requestAnimationFrame(animate);
+    }
+  };
+  
+  animate();
 };
 
 // 添加胜利动画函数
