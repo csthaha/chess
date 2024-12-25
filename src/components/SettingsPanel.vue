@@ -23,17 +23,20 @@
       <a-form :model="formState" layout="horizontal">
         <a-form-item label="显示落子顺序">
           <a-switch 
-            v-model:checked="formState.showMoveNumbers"
+            :checked="formState.showMoveNumbers"
+            @change="(checked) => formState.showMoveNumbers = checked"
           />
         </a-form-item>
         <a-form-item label="显示坐标">
           <a-switch 
-            v-model:checked="formState.showCoordinates"
+            :checked="formState.showCoordinates"
+            @change="(checked) => formState.showCoordinates = checked"
           />
         </a-form-item>
         <a-form-item label="落子音效">
           <a-switch 
-            v-model:checked="formState.soundEnabled"
+            :checked="formState.soundEnabled"
+            @change="(checked) => formState.soundEnabled = checked"
           />
         </a-form-item>
         <a-divider />
@@ -48,23 +51,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue';
+import { ref, reactive } from 'vue';
 import { SettingFilled } from '@ant-design/icons-vue';
 
 const props = defineProps({
-  showMoveNumbers: {
-    type: Boolean,
-    default: true
-  },
-  showCoordinates: {
-    type: Boolean,
-    default: true
-  },
-  soundEnabled: {
-    type: Boolean,
-    default: true
-  }
+  showMoveNumbers: Boolean,
+  showCoordinates: Boolean,
+  soundEnabled: Boolean
 });
+
+const emit = defineEmits(['updateSettings', 'reset']);
 
 const visible = ref(false);
 const formState = reactive({
@@ -73,34 +69,23 @@ const formState = reactive({
   soundEnabled: props.soundEnabled,
 });
 
-// 监听属性变化，同步到表单状态
-watch(() => props.showMoveNumbers, (val) => {
-  formState.showMoveNumbers = val;
-});
-
-watch(() => props.showCoordinates, (val) => {
-  formState.showCoordinates = val;
-});
-
-watch(() => props.soundEnabled, (val) => {
-  formState.soundEnabled = val;
-});
-
-const emit = defineEmits([
-  'update:showMoveNumbers', 
-  'update:showCoordinates', 
-  'update:soundEnabled',
-  'reset'
-]);
-
 const showModal = () => {
+  // 打开模态框时，同步当前状态
+  console.log(props.showMoveNumbers,1111111);
+  
+  formState.showMoveNumbers = props.showMoveNumbers;
+  formState.showCoordinates = props.showCoordinates;
+  formState.soundEnabled = props.soundEnabled;
   visible.value = true;
 };
 
 const handleOk = () => {
-  emit('update:showMoveNumbers', formState.showMoveNumbers);
-  emit('update:showCoordinates', formState.showCoordinates);
-  emit('update:soundEnabled', formState.soundEnabled);
+  // 发送更新事件
+  emit('updateSettings', {
+    showMoveNumbers: formState.showMoveNumbers,
+    showCoordinates: formState.showCoordinates,
+    soundEnabled: formState.soundEnabled
+  });
   visible.value = false;
 };
 

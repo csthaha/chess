@@ -1,42 +1,40 @@
 <!-- src/components/Gobang.vue -->
 <template>
-  <div class="game-container">
+  <div 
+    class="game-container"
+    @contextmenu="handleContextMenu"
+  >
     <div class="game-content">
-      <div class="gobang">
-        <canvas
-          ref="canvas" 
-          :width="canvasWidth" 
-          :height="canvasHeight" 
-          @click="handleClick"
-        >
-        </canvas>
-      </div>
-      <div class="control-panel">
-        <h3 class="panel-title">游戏控制</h3>
-        <div class="button-group">
-          <button class="control-btn undo" @click="undoLastMove" :disabled="moveCount === 0">
-            <span class="btn-icon">↩</span>
-            回退上一步
-          </button>
-          <button class="control-btn regret" @click="regretMove" :disabled="moveCount === 0">
-            <span class="btn-icon">⟲</span>
-            悔棋
-          </button>
-          <button class="control-btn reset" @click="resetBoard">
-            <span class="btn-icon">⟳</span>
-            重新开始
-          </button>
-          <button class="control-btn surrender" @click="surrender">
-            <span class="btn-icon">⚑</span>
-            认输
-          </button>
-        </div>
-      </div>
+      <canvas
+        ref="canvas"
+        :width="canvasWidth"
+        :height="canvasHeight"
+        @mousemove="handleMouseMove"
+        @click="handleClick"
+      ></canvas>
+      <GameControls
+        :moveCount="moveCount"
+        :canRedo="redoHistory.length > 0"
+        @undo="undoLastMove"
+        @redo="redoLastMove"
+        @regret="regretMove"
+        @reset="resetBoard"
+        @surrender="surrender"
+      />
     </div>
+    <ContextMenu
+      v-if="showContextMenu"
+      :position="contextMenuPosition"
+      :moveCount="moveCount"
+      :canRedo="redoHistory.length > 0"
+      @action="handleMenuClick"
+      @close="showContextMenu = false"
+    />
     <SettingsPanel
-      v-model:showMoveNumbers="showMoveNumbers"
-      v-model:showCoordinates="showCoordinates"
-      v-model:soundEnabled="soundEnabled"
+      :showMoveNumbers="gameSettings.showMoveNumbers"
+      :showCoordinates="gameSettings.showCoordinates"
+      :soundEnabled="gameSettings.soundEnabled"
+      @updateSettings="handleSettingsUpdate"
       @reset="resetBoard"
     />
   </div>
@@ -51,6 +49,10 @@ import { useGameBoard } from '../hooks/useGameBoard';
 import { usePieceDrawing } from '../hooks/usePieceDrawing';
 import { useAudio } from '../hooks/useAudio';
 import SettingsPanel from './SettingsPanel.vue';
+import { useConfetti } from '../hooks/useConfetti';
+import { useGameOperations } from '../hooks/useGameOperations';
+import GameControls from './GameControls.vue';
+import ContextMenu from './ContextMenu.vue';
 
 const canvas = ref(null);
 const boardSize = 15;
@@ -60,13 +62,13 @@ const {
   board,
   currentPlayer,
   moveCount,
-  showMoveNumbers,
+  moveHistory,
+  gameSettings,
   resetGame,
   switchPlayer,
   incrementMoveCount,
-  moveHistory,
   addMove,
-  undoMove,
+  updateSettings
 } = useGameState(boardSize);
 
 const {
@@ -81,23 +83,124 @@ const {
 const { drawPiece } = usePieceDrawing(cellSize);
 const { checkForbiddenMove } = useForbiddenMove(board, boardSize);
 const { playDownSound } = useAudio();
+const { createConfetti, updateConfetti } = useConfetti(canvasWidth, canvasHeight);
+let animationFrameId = null;
 
-// 添加新的状态
-const showCoordinates = ref(true);
-const soundEnabled = ref(true);
+// 添加右键菜单状态
+const showContextMenu = ref(false);
+const contextMenuPosition = ref({ x: 0, y: 0 });
 
-// 监听坐标显示变化
-watch(showCoordinates, () => {
+// 添加鼠标悬停状态
+const hoverPosition = ref({ row: -1, col: -1 });
+const lastMove = ref({ row: -1, col: -1 });
+
+// 添加重做历史记录
+const redoHistory = ref([]);
+
+
+// 添加重做函数
+const redoMove = () => {
+  if (redoHistory.value.length > 0) {
+    const nextMove = redoHistory.value.pop();
+    moveHistory.value.push(nextMove);
+    return nextMove;
+  }
+  return null;
+};
+
+// 处理右键点击
+const handleContextMenu = (event) => {
+  event.preventDefault();
+  showContextMenu.value = true;
+  contextMenuPosition.value = {
+    x: event.clientX,
+    y: event.clientY
+  };
+};
+
+// 处理菜单项点击
+const handleMenuClick = (action) => {
+  switch (action) {
+    case 'undo':
+      undoLastMove();
+      break;
+    case 'regret':
+      regretMove();
+      break;
+    case 'reset':
+      resetBoard();
+      break;
+    case 'surrender':
+      surrender();
+      break;
+  }
+  showContextMenu.value = false;
+};
+
+// 处理鼠标移动
+const handleMouseMove = (event) => {
+  const rect = canvas.value.getBoundingClientRect();
+  const offset = cellSize.value;
+  
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+
+  const col = Math.round((x - offset) / offset);
+  const row = Math.round((y - offset) / offset);
+
+  if (
+    row >= 0 && 
+    row < boardSize && 
+    col >= 0 && 
+    col < boardSize && 
+    board.value[row][col] === 0
+  ) {
+    hoverPosition.value = { row, col };
+    initBoard(); // 重绘棋盘
+    drawHoverPiece(row, col); // 绘制悬停效果
+  } else {
+    hoverPosition.value = { row: -1, col: -1 };
+    initBoard();
+  }
+};
+
+// 处理鼠标移出
+const handleMouseOut = () => {
+  hoverPosition.value = { row: -1, col: -1 };
   initBoard();
-});
+};
 
-// 初始化棋盘
+// 绘制悬停效果
+const drawHoverPiece = (row, col) => {
+  const ctx = canvas.value.getContext('2d');
+  const offset = cellSize.value;
+  const x = offset + col * cellSize.value;
+  const y = offset + row * cellSize.value;
+  const radius = cellSize.value * 0.48;
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = currentPlayer.value === 1 ? 
+    'rgba(0, 0, 0, 0.3)' : 
+    'rgba(255, 255, 255, 0.3)';
+  ctx.fill();
+  
+  if (currentPlayer.value === 2) {
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+};
+
+// 先声明 initBoard 函数
 const initBoard = () => {
+  if (!canvas.value) return;
+  
   const ctx = canvas.value.getContext('2d');
   const offset = cellSize.value;
   
   drawBoard(ctx, offset);
-  if (showCoordinates.value) {
+  if (gameSettings.value.showCoordinates) {
     drawCoordinates(ctx, offset);
   }
   drawStarPoints(ctx, offset);
@@ -110,11 +213,21 @@ const initBoard = () => {
       move.row,
       move.player,
       offset,
-      showMoveNumbers.value,
+      gameSettings.value.showMoveNumbers,
       index + 1
     );
+    
+    // 如果是最后一步，绘制标记
+    if (index === moveHistory.value.length - 1) {
+      drawLastMoveMarker(ctx, move.col, move.row, offset);
+    }
   });
 };
+
+// 只保留一个 watch
+watch(() => gameSettings.value, () => {
+  initBoard();
+}, { deep: true, immediate: true });
 
 // 处理点击事件
 const handleClick = (event) => {
@@ -129,11 +242,24 @@ const handleClick = (event) => {
   const row = Math.round((y - offset) / offset);
 
   if (row >= 0 && row < boardSize && col >= 0 && col < boardSize && board.value[row][col] === 0) {
+    redoHistory.value = []; // 清空重做历史
     board.value[row][col] = currentPlayer.value;
-    drawPiece(ctx, col, row, currentPlayer.value, offset, showMoveNumbers.value, moveCount.value + 1);
+    lastMove.value = { row, col }; // 记录最后一步
     
-    // 根据设置决定是否播放音效
-    if (soundEnabled.value) {
+    drawPiece(
+      ctx, 
+      col, 
+      row, 
+      currentPlayer.value, 
+      offset, 
+      gameSettings.value.showMoveNumbers,
+      moveCount.value + 1
+    );
+    
+    // 绘制最后一步的标记
+    drawLastMoveMarker(ctx, col, row, offset);
+    
+    if (gameSettings.value.soundEnabled) {
       playDownSound();
     }
     
@@ -147,14 +273,26 @@ const handleClick = (event) => {
   }
 };
 
+// 添加最后一步标记的绘制函数
+const drawLastMoveMarker = (ctx, col, row, offset) => {
+  const x = offset + col * cellSize.value;
+  const y = offset + row * cellSize.value;
+  const radius = cellSize.value * 0.48;
+  
+  ctx.beginPath();
+  ctx.arc(x, y, radius + 2, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ff4d4f';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+};
+
 // 检查胜利
 const checkWin = (row, col) => {
   if (currentPlayer.value === 1) {
     const isForbidden = checkForbiddenMove(row, col);
     if (isForbidden) {
       message.error('黑禁手，白胜！');
-      resetGame();
-      initBoard();
+      startWinAnimation(2);
       return true;
     }
   }
@@ -205,8 +343,7 @@ const checkWin = (row, col) => {
     if (count >= 5) {
       setTimeout(() => {
         message.success(`${currentPlayer.value === 1 ? '黑' : '白'}子胜！`);
-        resetGame();
-        initBoard();
+        startWinAnimation(currentPlayer.value);
       }, 100);
       return true;
     }
@@ -214,68 +351,80 @@ const checkWin = (row, col) => {
   return false;
 };
 
-// 重置棋盘
-const resetBoard = () => {
-  resetGame();
-  initBoard();
-};
+// 添加胜利动画函数
+const startWinAnimation = (winner) => {
+  // 在棋盘中心创建粒子效果
+  const centerX = canvasWidth.value / 2;
+  const centerY = canvasHeight.value / 2;
+  createConfetti(centerX, centerY);
 
-// 添加新的功能函数
-const undoLastMove = () => {
-  if (moveCount.value > 0) {
-    const lastMove = undoMove();
-    if (lastMove) {
-      board.value[lastMove.row][lastMove.col] = 0;
+  // 开始动画循环
+  const animate = () => {
+    const ctx = canvas.value.getContext('2d');
+    
+    // 重绘棋盘
+    initBoard();
+    
+    // 更新和绘制粒子
+    const hasParticles = updateConfetti(ctx);
+    
+    if (hasParticles) {
+      animationFrameId = requestAnimationFrame(animate);
+    } else {
+      cancelAnimationFrame(animationFrameId);
+      resetGame();
       initBoard();
-      // 重绘所有棋子
-      moveHistory.value.forEach((move, index) => {
-        const ctx = canvas.value.getContext('2d');
-        drawPiece(ctx, move.col, move.row, move.player, cellSize.value, showMoveNumbers.value, index + 1);
-      });
-      switchPlayer();
     }
-  }
+  };
+
+  animate();
 };
 
-const regretMove = () => {
-  if (moveCount.value > 0) {
-    Modal.confirm({
-      title: '确认悔棋',
-      content: '确定要悔棋吗？',
-      okText: '确定',
-      cancelText: '取消',
-      onOk() {
-        undoLastMove();
-      }
-    });
-  }
-};
-
-const surrender = () => {
-  Modal.confirm({
-    title: '确认认输',
-    content: `${currentPlayer.value === 1 ? '黑' : '白'}方确定要认输吗？`,
-    okText: '确定',
-    cancelText: '取消',
-    onOk() {
-      message.success(`${currentPlayer.value === 1 ? '白' : '黑'}方获胜！`);
-      resetBoard();
-    }
-  });
-};
+// 在 setup 中使用
+const {
+  undoLastMove,
+  redoLastMove,
+  regretMove,
+  surrender,
+  resetBoard
+} = useGameOperations(
+  moveCount,
+  currentPlayer,
+  redoMove,
+  switchPlayer,
+  board,
+  resetGame,
+  initBoard,
+  startWinAnimation
+);
 
 defineExpose({
   resetBoard,
-  showMoveNumbers,
 });
 
 onMounted(() => {
   initBoard();
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.context-menu')) {
+      showContextMenu.value = false;
+    }
+  });
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', adjustCanvasSize);
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
 });
+
+// 添加设置更新处理函数
+const handleSettingsUpdate = (newSettings) => {
+  gameSettings.value = {
+    ...gameSettings.value,
+    ...newSettings
+  };
+};
 </script>
 
 <style scoped>
@@ -426,6 +575,59 @@ canvas {
   .control-panel {
     width: 100%;
     max-width: 400px;
+  }
+}
+
+.context-menu {
+  position: fixed;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  padding: 8px 0;
+  min-width: 160px;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #333;
+  font-size: 14px;
+}
+
+.context-menu-item:hover {
+  background: #f5f5f5;
+  color: #00b96b;
+}
+
+.context-menu-item.danger {
+  color: #ff4d4f;
+}
+
+.context-menu-item.danger:hover {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.menu-icon {
+  margin-right: 8px;
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 </style>

@@ -4,14 +4,20 @@ export const useGameState = (boardSize = 15) => {
   const board = ref(Array.from({ length: boardSize }, () => Array(boardSize).fill(0)));
   const currentPlayer = ref(1); // 1 for black, 2 for white
   const moveCount = ref(0);
-  const showMoveNumbers = ref(true);
-  const moveHistory = ref([]); // 新增：记录移动历史
+  const moveHistory = ref([]); // 记录移动历史
+  
+  // 游戏设置状态
+  const gameSettings = ref({
+    showMoveNumbers: true,
+    showCoordinates: true,
+    soundEnabled: true
+  });
 
   const resetGame = () => {
     board.value = Array.from({ length: boardSize }, () => Array(boardSize).fill(0));
     moveCount.value = 0;
     currentPlayer.value = 1;
-    moveHistory.value = []; // 清空历史记录
+    moveHistory.value = [];
   };
 
   const switchPlayer = () => {
@@ -37,16 +43,24 @@ export const useGameState = (boardSize = 15) => {
     return null;
   };
 
+  const updateSettings = (settings) => {
+    gameSettings.value = {
+      ...gameSettings.value,
+      ...settings
+    };
+  };
+
   return {
     board,
     currentPlayer,
     moveCount,
-    showMoveNumbers,
-    moveHistory, // 新增
+    moveHistory,
+    gameSettings,
     resetGame,
     switchPlayer,
     incrementMoveCount,
-    addMove, // 新增
-    undoMove, // 新增
+    addMove,
+    undoMove,
+    updateSettings
   };
 }; 

@@ -3,9 +3,9 @@
   <a-config-provider :theme="{ token: { colorPrimary: '#00b96b' } }">
     <div id="app">
       <CheckBoard ref="checkboardRef" />
-      <SettingsPanel 
+      <!-- <SettingsPanel 
         
-      />
+      /> -->
     </div>
   </a-config-provider>
 </template>
@@ -16,15 +16,9 @@ import CheckBoard from './components/CheckBoard.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 
 const checkboardRef = ref(null);
-const showMoveNumbers = ref(false);
-
 const handleReset = () => {
   checkboardRef.value?.resetBoard();
 };
-const handleShowMoveNumbersChange = (newValue) => {
-  showMoveNumbers.value = newValue;
-};
-
 
 </script>
 
