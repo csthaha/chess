@@ -2,23 +2,14 @@
 <template>
   <a-config-provider :theme="{ token: { colorPrimary: '#00b96b' } }">
     <div id="app">
-      <CheckBoard ref="checkboardRef" />
-      <!-- <SettingsPanel 
-        
-      /> -->
+      <CheckBoard />
     </div>
   </a-config-provider>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
-import CheckBoard from './components/CheckBoard.vue';
-import SettingsPanel from './components/SettingsPanel.vue';
 
-const checkboardRef = ref(null);
-const handleReset = () => {
-  checkboardRef.value?.resetBoard();
-};
+import CheckBoard from './components/CheckBoard.vue';
 
 </script>
 

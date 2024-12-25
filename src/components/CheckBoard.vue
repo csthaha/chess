@@ -5,22 +5,29 @@
     @contextmenu="handleContextMenu"
   >
     <div class="game-content">
-      <canvas
-        ref="canvas"
-        :width="canvasWidth"
-        :height="canvasHeight"
-        @mousemove="handleMouseMove"
-        @click="handleClick"
-      ></canvas>
-      <GameControls
-        :moveCount="moveCount"
-        :canRedo="redoHistory.length > 0"
-        @undo="undoLastMove"
-        @redo="redoLastMove"
-        @regret="regretMove"
-        @reset="resetBoard"
-        @surrender="surrender"
-      />
+      <div class="game-left">
+        <canvas
+          ref="canvas"
+          :width="canvasWidth"
+          :height="canvasHeight"
+          @mousemove="handleMouseMove"
+          @click="handleClick"
+          @mouseout="handleMouseOut"
+        ></canvas>
+        <GameTimer :currentPlayer="currentPlayer" />
+      </div>
+      <div class="game-right">
+        <GameControls
+          :moveCount="moveCount"
+          :canRedo="redoHistory.length > 0"
+          @undo="undoLastMove"
+          @redo="redoLastMove"
+          @regret="regretMove"
+          @reset="resetBoard"
+          @surrender="surrender"
+        />
+        <SettingsPanel @update="handleSettingsUpdate" />
+      </div>
     </div>
     <ContextMenu
       v-if="showContextMenu"
@@ -29,13 +36,6 @@
       :canRedo="redoHistory.length > 0"
       @action="handleMenuClick"
       @close="showContextMenu = false"
-    />
-    <SettingsPanel
-      :showMoveNumbers="gameSettings.showMoveNumbers"
-      :showCoordinates="gameSettings.showCoordinates"
-      :soundEnabled="gameSettings.soundEnabled"
-      @updateSettings="handleSettingsUpdate"
-      @reset="resetBoard"
     />
   </div>
 </template>
@@ -53,6 +53,7 @@ import { useConfetti } from '../hooks/useConfetti';
 import { useGameOperations } from '../hooks/useGameOperations';
 import GameControls from './GameControls.vue';
 import ContextMenu from './ContextMenu.vue';
+import GameTimer from './GameTimer.vue';
 
 const canvas = ref(null);
 const boardSize = 15;
@@ -629,5 +630,11 @@ canvas {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+.game-left {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 </style>
