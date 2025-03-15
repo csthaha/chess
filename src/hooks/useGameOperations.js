@@ -15,6 +15,7 @@ export const useGameOperations = (
   const undoLastMove = () => {
     if (moveCount.value > 0) {
       const lastMove = undoMove();
+      console.log(555, moveCount.value, lastMove);
       if (lastMove) {
         board.value[lastMove.row][lastMove.col] = 0;
         initBoard();

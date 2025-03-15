@@ -5,12 +5,13 @@ export const useGameState = (boardSize = 15) => {
   const currentPlayer = ref(1); // 1 for black, 2 for white
   const moveCount = ref(0);
   const moveHistory = ref([]); // 记录移动历史
-  
+  const isFinish = ref(false);
+
   // 游戏设置状态
   const gameSettings = ref({
-    showMoveNumbers: true,
-    showCoordinates: true,
-    soundEnabled: true
+    showMoveNumbers: false,
+    showCoordinates: false,
+    soundEnabled: false
   });
 
   const resetGame = () => {
@@ -18,6 +19,7 @@ export const useGameState = (boardSize = 15) => {
     moveCount.value = 0;
     currentPlayer.value = 1;
     moveHistory.value = [];
+    isFinish.value = false;
   };
 
   const switchPlayer = () => {
@@ -52,6 +54,7 @@ export const useGameState = (boardSize = 15) => {
 
   return {
     board,
+    isFinish,
     currentPlayer,
     moveCount,
     moveHistory,

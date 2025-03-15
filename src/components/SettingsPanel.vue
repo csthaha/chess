@@ -12,10 +12,12 @@
     </a-button>
 
     <a-modal
-      :visible="visible"
+      :open="visible"
       title="游戏设置"
       :width="400"
       centered
+      cancelText="取消"
+      okText="确定"
       class="settings-modal"
       @ok="handleOk"
       @cancel="handleCancel"
@@ -71,8 +73,6 @@ const formState = reactive({
 
 const showModal = () => {
   // 打开模态框时，同步当前状态
-  console.log(props.showMoveNumbers,1111111);
-  
   formState.showMoveNumbers = props.showMoveNumbers;
   formState.showCoordinates = props.showCoordinates;
   formState.soundEnabled = props.soundEnabled;

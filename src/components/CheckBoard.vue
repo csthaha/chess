@@ -1,8 +1,8 @@
 <!-- src/components/Gobang.vue -->
 <template>
+  <!-- @contextmenu="handleContextMenu" -->
   <div 
     class="game-container"
-    @contextmenu="handleContextMenu"
   >
     <GameTips
       ref="gameTips"
@@ -41,7 +41,12 @@
           @reset="resetBoard"
           @surrender="surrender"
         />
-        <SettingsPanel @update="handleSettingsUpdate" />
+        <SettingsPanel
+          :showCoordinates="gameSettings.showCoordinates"
+          :soundEnabled="gameSettings.soundEnabled"
+          :showMoveNumbers="gameSettings.showMoveNumbers"
+          @updateSettings="handleSettingsUpdate" 
+        />
       </div>
     </div>
     <ContextMenu
@@ -87,7 +92,8 @@ const {
   switchPlayer,
   incrementMoveCount,
   addMove,
-  updateSettings
+  undoMove,
+  isFinish
 } = useGameState(boardSize);
 
 const {
@@ -104,6 +110,9 @@ const { checkForbiddenMove } = useForbiddenMove(board, boardSize);
 const { playDownSound } = useAudio();
 const { createConfetti, updateConfetti } = useConfetti(canvasWidth, canvasHeight);
 let animationFrameId = null;
+
+const isWinningPattern = ref(false);
+const patternName = ref('');
 
 // 添加右键菜单状态
 const showContextMenu = ref(false);
@@ -170,6 +179,7 @@ const handleMouseMove = (event) => {
   const row = Math.round((y - offset) / offset);
 
   if (
+    !isFinish.value &&
     row >= 0 && 
     row < boardSize && 
     col >= 0 && 
@@ -262,8 +272,8 @@ const handleClick = (event) => {
   const col = Math.round((x - offset) / offset);
   const row = Math.round((y - offset) / offset);
 
-  if (row >= 0 && row < boardSize && col >= 0 && col < boardSize && board.value[row][col] === 0) {
-    redoHistory.value = []; // 清空重做历史
+  if (!isFinish.value && row >= 0 && row < boardSize && col >= 0 && col < boardSize && board.value[row][col] === 0) {
+    // redoHistory.value = []; // 清空重做历史
     board.value[row][col] = currentPlayer.value;
     lastMove.value = { row, col }; // 记录最后一步
     
@@ -309,14 +319,14 @@ const drawLastMoveMarker = (ctx, col, row, offset) => {
 
 // 检查胜利
 const checkWin = (row, col) => {
-  if (currentPlayer.value === 1) {
-    const isForbidden = checkForbiddenMove(row, col);
-    if (isForbidden) {
-      message.error('黑禁手，白胜！');
-      startWinAnimation(2);
-      return true;
-    }
-  }
+  // if (currentPlayer.value === 1) {
+  //   const isForbidden = checkForbiddenMove(row, col);
+  //   if (isForbidden) {
+  //     message.error('黑禁手，白胜！');
+  //     startWinAnimation(2);
+  //     return true;
+  //   }
+  // }
 
   const directions = [
     [1, 0],   // 水平
@@ -365,6 +375,7 @@ const checkWin = (row, col) => {
 
     // 判断是否胜利
     if (count >= 5) {
+      isFinish.value = true;
       winningPieces.value = pieces;
       animateWinningPieces();
       setTimeout(() => {
@@ -447,8 +458,8 @@ const startWinAnimation = (winner) => {
       animationFrameId = requestAnimationFrame(animate);
     } else {
       cancelAnimationFrame(animationFrameId);
-      resetGame();
-      initBoard();
+      // resetGame();
+      // initBoard();
     }
   };
 
@@ -465,6 +476,7 @@ const {
 } = useGameOperations(
   moveCount,
   currentPlayer,
+  undoMove,
   redoMove,
   switchPlayer,
   board,
@@ -495,6 +507,7 @@ onBeforeUnmount(() => {
 
 // 添加设置更新处理函数
 const handleSettingsUpdate = (newSettings) => {
+  console.log(newSettings, 1111111);
   gameSettings.value = {
     ...gameSettings.value,
     ...newSettings
